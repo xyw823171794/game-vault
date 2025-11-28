@@ -1,6 +1,52 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GAME_VAULT_API_KEY });
+// Helper to safely get the API Key and Base URL from Env or LocalStorage
+const getClientConfig = () => {
+  // 1. Try LocalStorage (User Settings)
+  const localKey = localStorage.getItem('gv_api_key');
+  const localBaseUrl = localStorage.getItem('gv_base_url');
+
+  // 2. Try Env Vars
+  let envKey = '';
+  let envBaseUrl = '';
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      envKey = import.meta.env.VITE_GAME_VAULT_API_KEY;
+      // @ts-ignore
+      envBaseUrl = import.meta.env.VITE_GOOGLE_API_BASE_URL;
+    }
+  } catch (e) {}
+
+  if (!envKey) {
+    try {
+      envKey = process.env.API_KEY || '';
+      envBaseUrl = process.env.GOOGLE_API_BASE_URL || '';
+    } catch (e) {}
+  }
+
+  const finalKey = localKey || envKey;
+  const finalBaseUrl = localBaseUrl || envBaseUrl;
+
+  return { apiKey: finalKey, baseUrl: finalBaseUrl };
+};
+
+// We create a function to get the client instead of a static instance
+// This ensures we pick up changes from localStorage if the user updates settings
+const getAIClient = () => {
+  const { apiKey, baseUrl } = getClientConfig();
+  
+  if (!apiKey) {
+    console.warn("API Key is missing! Please set via Settings or Environment Variables.");
+  }
+
+  const clientOptions: any = { apiKey: apiKey || 'dummy_key' };
+  if (baseUrl) {
+    clientOptions.baseUrl = baseUrl;
+  }
+  return new GoogleGenAI(clientOptions);
+};
 
 export interface GameMetadata {
   title: string;
@@ -12,6 +58,7 @@ export interface GameMetadata {
 
 export const fetchGameMetadata = async (query: string): Promise<GameMetadata> => {
   try {
+    const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `你是一个专业的中文游戏资料库助手。请检索游戏 "${query}" 的详细元数据。
@@ -52,7 +99,10 @@ export const fetchGameMetadata = async (query: string): Promise<GameMetadata> =>
     const text = response.text;
     if (!text) throw new Error("No data returned from AI");
     
-    return JSON.parse(text) as GameMetadata;
+    // Clean up potential markdown code blocks if AI ignores mimeType in rare cases
+    const cleanedText = text.replace(/```json|```/g, '').trim();
+    
+    return JSON.parse(cleanedText) as GameMetadata;
   } catch (error) {
     console.error("AI Fetch Error:", error);
     throw error;
@@ -61,6 +111,7 @@ export const fetchGameMetadata = async (query: string): Promise<GameMetadata> =>
 
 export const generateGameCover = async (title: string): Promise<string> => {
   try {
+    const ai = getAIClient();
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -68,7 +119,6 @@ export const generateGameCover = async (title: string): Promise<string> => {
           { text: `Create a vertical, high-quality, cinematic video game cover art for the game "${title}". The style should be digital art, suitable for a game box. No text overlay.` }
         ]
       },
-      // config: { imageConfig: { aspectRatio: "3:4" } } // Not strictly supported on all models via this SDK yet, implied by prompt "vertical"
     });
 
     for (const part of response.candidates?.[0]?.content?.parts || []) {
