@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Game } from './types';
 import { GameLibrary } from './components/GameLibrary';
 import { GameForm } from './components/GameForm';
 import { StatsView } from './components/StatsView';
 import { TimelineView } from './components/TimelineView';
-import { LayoutDashboard, Library, PlusCircle, Gamepad2, Ghost, History } from 'lucide-react';
+import { SettingsModal } from './components/SettingsModal';
+import { LayoutDashboard, Library, PlusCircle, Gamepad2, Ghost, History, Settings } from 'lucide-react';
 
 const STORAGE_KEY = 'gamevault_data';
 
@@ -57,6 +57,7 @@ const App = () => {
   const [games, setGames] = useState<Game[]>([]);
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [editingGame, setEditingGame] = useState<Game | undefined>(undefined);
+  const [showSettings, setShowSettings] = useState(false);
 
   // Load from local storage
   useEffect(() => {
@@ -106,7 +107,7 @@ const App = () => {
        coverUrl: g.coverUrl || '',
        addedAt: g.addedAt || new Date().toISOString(),
        lastPlayedAt: g.lastPlayedAt, // Pass this field through
-       notes: 'Imported from platform'
+       notes: g.notes || 'Imported from platform'
     }));
     
     setGames(prev => [...gamesToAdd, ...prev]);
@@ -171,10 +172,18 @@ const App = () => {
           </div>
         </nav>
 
-        <div className="p-6 border-t border-slate-900/50 text-center lg:text-left">
-           <div className="hidden lg:flex items-center gap-2 text-xs text-slate-600">
+        <div className="p-4 border-t border-slate-900/50 flex flex-col gap-4">
+           <button 
+             onClick={() => setShowSettings(true)}
+             className="w-full flex items-center justify-center lg:justify-start gap-3 px-3 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all group"
+           >
+             <Settings size={20} className="group-hover:rotate-90 transition-transform duration-500" />
+             <span className="hidden lg:block font-medium text-sm">设置</span>
+           </button>
+           
+           <div className="hidden lg:flex items-center justify-center gap-2 text-xs text-slate-600">
              <Ghost size={12} />
-             <span>v1.4.1 &bull; 离线可用</span>
+             <span>v1.6.0 &bull; 离线可用</span>
            </div>
         </div>
       </aside>
@@ -217,6 +226,8 @@ const App = () => {
           )}
         </div>
       </main>
+
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
     </div>
   );
 };
